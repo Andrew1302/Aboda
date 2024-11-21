@@ -2,8 +2,8 @@ from fastapi import FastAPI, UploadFile, Depends, HTTPException, File
 from sqlalchemy.orm import Session
 from database import Base, engine, get_db
 from models import Asset, Price
-from crud import create_prices, get_highest_volume
-from schemas import PriceResponse
+from crud import create_prices, get_highest_volume, get_lowest_closing_price, get_mean_daily_price
+from schemas import VolumeResponse, CloseResponse, MeanPriceResponse
 import pandas as pd
 from typing import List 
 
@@ -51,9 +51,23 @@ async def upload_csv(files: List[UploadFile] = File(...), db: Session = Depends(
             raise HTTPException(status_code=500, detail=f"Error processing file {file.filename}: {str(e)}")
     return {"message": "Data uploaded successfully"}
 
-@app.get("/highest-volume/", response_model=PriceResponse)
+@app.get("/highest-volume/", response_model=VolumeResponse)
 def highest_volume(ticker: str = None, db: Session = Depends(get_db)):
     price = get_highest_volume(db, ticker)
+    if not price:
+        raise HTTPException(status_code=404, detail="No data found")
+    return price
+
+@app.get("/lowest-closing-price/", response_model=CloseResponse)
+def lowest_closing_price(ticker: str = None, db: Session = Depends(get_db)):
+    price = get_lowest_closing_price(db, ticker)
+    if not price:
+        raise HTTPException(status_code=404, detail="No data found")
+    return price
+
+@app.get("/mean-daily-price/", response_model=MeanPriceResponse)
+def mean_daily_price(ticker: str, date: str, db: Session = Depends(get_db)):
+    price = get_mean_daily_price(db, ticker, date)
     if not price:
         raise HTTPException(status_code=404, detail="No data found")
     return price

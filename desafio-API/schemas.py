@@ -13,10 +13,20 @@ class PriceBase(BaseModel):
 class AssetBase(BaseModel):
     ticker: str
 
-class PriceResponse(BaseModel):
+class VolumeResponse(BaseModel):
     ticker: str
     date: date
     volume: int
+
+class CloseResponse(BaseModel):
+    ticker: str
+    date: date
+    close: float
+
+class MeanPriceResponse(BaseModel):
+    ticker: str
+    date: date
+    mean_price: float
 
     class Config:
         from_attributes = True

@@ -1,3 +1,4 @@
+from datetime import date
 from sqlalchemy.orm import Session
 from models import Asset, Price
 from schemas import PriceBase
@@ -29,5 +30,31 @@ def get_highest_volume(db: Session, ticker: str = None):
             "ticker": result.ticker,
             "date": result.date,
             "volume": result.volume,
+        }
+    return None
+
+def get_lowest_closing_price(db: Session, ticker: str = None):
+    query = db.query(Price.date, Price.close, Asset.ticker).join(Asset, Price.asset_id == Asset.id)
+    if ticker:
+        query = query.filter(Asset.ticker == ticker)
+    result = query.order_by(Price.close).first()
+    if result:
+        return {
+            "ticker": result.ticker,
+            "date": result.date,
+            "close": result.close,
+        }
+    return None
+
+def get_mean_daily_price(db: Session, ticker: str, date: date):
+    query = db.query(Price.date, Price.open_price, Price.close, Asset.ticker).join(Asset, Price.asset_id == Asset.id)
+    query = query.filter(Asset.ticker == ticker, Price.date == date)
+    result = query.first()
+    if result:
+        mean_price = (result.open_price + result.close) / 2
+        return {
+            "ticker": result.ticker,
+            "date": result.date,
+            "mean_price": mean_price,
         }
     return None
