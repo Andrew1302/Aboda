@@ -20,7 +20,14 @@ def create_prices(db: Session, ticker: str, prices: list[PriceBase]):
     db.commit()
 
 def get_highest_volume(db: Session, ticker: str = None):
-    query = db.query(Price)
+    query = db.query(Price.date, Price.volume, Asset.ticker).join(Asset, Price.asset_id == Asset.id)
     if ticker:
-        query = query.join(Asset).filter(Asset.ticker == ticker)
-    return query.order_by(Price.volume.desc()).first()
+        query = query.filter(Asset.ticker == ticker)
+    result = query.order_by(Price.volume.desc()).first()
+    if result:
+        return {
+            "ticker": result.ticker,
+            "date": result.date,
+            "volume": result.volume,
+        }
+    return None

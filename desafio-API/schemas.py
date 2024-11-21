@@ -14,6 +14,7 @@ class AssetBase(BaseModel):
     ticker: str
 
 class PriceResponse(BaseModel):
+    ticker: str
     date: date
     volume: int
 
