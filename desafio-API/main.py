@@ -1,16 +1,17 @@
 from datetime import date
-from fastapi import FastAPI, UploadFile, Depends, HTTPException, File
+from fastapi import FastAPI, UploadFile, Depends, HTTPException, File, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from database import Base, engine, get_db
 from middleware import check_start_end_date, check_ticker
 from models import Asset, Price
-from schemas import DailyVariationResponse, PriceBase
-from crud import update_prices, create_prices, get_highest_volume, get_lowest_closing_price
+from schemas import ConsolidatedResponse, DailyVariationResponse, PriceBase, PaginatedResponse
+from crud import get_consolidated_data, update_prices, create_prices, get_highest_volume, get_lowest_closing_price
 from crud import get_mean_daily_price, get_assets, delete_asset, get_daily_variation
 from schemas import VolumeResponse, CloseResponse, MeanPriceResponse
 import pandas as pd
 from typing import List
+from utils import paginate
 
 TAG_MANAGE_DATA = "Manage Data"
 TAG_STATISTICS = "Statistics"
@@ -154,8 +155,8 @@ def lowest_closing_price(ticker: str = None, start_date: date = None, end_date: 
         raise HTTPException(status_code=404, detail="No data found")
     return price
 
-@app.get("/mean-daily-price/", response_model=List[MeanPriceResponse], tags=[TAG_STATISTICS])
-def mean_daily_price(ticker: str, start_date: date = None, end_date: date = None, db: Session = Depends(get_db)):
+@app.get("/mean-daily-price/", response_model=PaginatedResponse, tags=[TAG_STATISTICS])
+def mean_daily_price(ticker: str, start_date: date = None, end_date: date = None, page: int = Query(1, ge=1), page_size: int = Query(10, ge=1), db: Session = Depends(get_db)):
     """
     Get the daily mean price between the opening and closing prices for a given ticker.
     You can optionally filter the results by a date range.
@@ -169,10 +170,11 @@ def mean_daily_price(ticker: str, start_date: date = None, end_date: date = None
     prices = get_mean_daily_price(db, ticker, start_date, end_date)
     if not prices:
         raise HTTPException(status_code=404, detail="No data found")
-    return prices
+    paginated_data, current_page, total_pages = paginate(prices, page, page_size)
+    return {"data": paginated_data, "page": current_page, "total_pages": total_pages}
 
-@app.get("/daily-variation/", response_model=List[DailyVariationResponse], tags=[TAG_STATISTICS])
-def daily_variation(ticker: str, start_date: date = None, end_date: date = None, db: Session = Depends(get_db)):
+@app.get("/daily-variation/", response_model=PaginatedResponse, tags=[TAG_STATISTICS])
+def daily_variation(ticker: str, start_date: date = None, end_date: date = None, page: int = Query(1, ge=1), page_size: int = Query(10, ge=1), db: Session = Depends(get_db)):
     """
     Get the daily percentage variation between the opening and closing prices for a given ticker.
     You can optionally filter the results by a date range.
@@ -186,4 +188,23 @@ def daily_variation(ticker: str, start_date: date = None, end_date: date = None,
     variations = get_daily_variation(db, ticker, start_date, end_date)
     if not variations:
         raise HTTPException(status_code=404, detail="No data found")
-    return variations
+    paginated_data, current_page, total_pages = paginate(variations, page, page_size)
+    return {"data": paginated_data, "page": current_page, "total_pages": total_pages}
+
+@app.get("/consolidated-data/", response_model=PaginatedResponse, tags=[TAG_STATISTICS])
+def consolidated_data(ticker: str, start_date: date = None, end_date: date = None, page: int = Query(1, ge=1), page_size: int = Query(10, ge=1), db: Session = Depends(get_db)):
+    """
+    Get consolidated data for a given ticker, including mean price and percentage variation.
+    You can optionally filter the results by a date range.
+
+    Returns:
+        A list of consolidated data with date, mean price, and variation percentage.
+    """
+    ticker = ticker.upper()
+    check_ticker(ticker, db)
+    check_start_end_date(start_date, end_date)
+    data = get_consolidated_data(db, ticker, start_date, end_date)
+    if not data:
+        raise HTTPException(status_code=404, detail="No data found")
+    paginated_data, current_page, total_pages = paginate(data, page, page_size)
+    return {"data": paginated_data, "page": current_page, "total_pages": total_pages}

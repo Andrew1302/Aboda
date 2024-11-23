@@ -120,3 +120,22 @@ def get_daily_variation(db: Session, ticker: str, start_date: date = None, end_d
             "variation": variation
         })
     return variations
+
+def get_consolidated_data(db: Session, ticker: str, start_date: date = None, end_date: date = None):
+    query = db.query(Price.date, Price.open_price, Price.close).join(Asset, Price.asset_id == Asset.id)
+    query = query.filter(Asset.ticker == ticker)
+    if start_date:
+        query = query.filter(Price.date >= start_date)
+    if end_date:
+        query = query.filter(Price.date <= end_date)
+    results = query.all()
+    consolidated_data = []
+    for result in results:
+        mean_price = (result.open_price + result.close) / 2
+        variation = ((result.close - result.open_price) / result.open_price) * 100
+        consolidated_data.append({
+            "date": result.date,
+            "mean_price": mean_price,
+            "variation": variation
+        })
+    return consolidated_data
