@@ -9,10 +9,13 @@ from schemas import VolumeResponse, CloseResponse, MeanPriceResponse
 import pandas as pd
 from typing import List 
 
+TAG_MANAGE_DATA = "Manage Data"
+TAG_STATISTICS = "Statistics"
+
 app = FastAPI(
-    title="API para consulta de dados sobre stocks",
-    description="Para o primeiro uso desta API, você deve fazer upload de arquivos CSV contendo dados de preços de ações."
-     +"\t Os arquivos devem conter as colunas 'Date', 'Open', 'High', 'Low', 'Close', 'Adj Close' e 'Volume'.",
+    title="ABODA CHALLENGE",
+    description="This API was built as part of Aboda's selection process."
+    + "\nFor the first use of this API, you must upload CSV files containing stock price data.",
     version="1.0.0",
     contact={
         "name": "Andrew Carvalho de Sá",
@@ -30,12 +33,12 @@ Base.metadata.create_all(bind=engine)
 async def root():
     return RedirectResponse(url="/docs")
 
-@app.post("/upload-assets/")
+@app.post("/assets/", tags=[TAG_MANAGE_DATA])
 async def upload_csv(files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
     """
     Insert a list of CSV files into the database.
     Each file should contain the columns 'Date', 'Open', 'High', 'Low', 'Close', 'Adj Close' and 'Volume'.
-    If you upload a file from an asset that is already in the database, the data will be duplicated, so consider using the update-assets endpoint instead.
+    If you upload a file from an asset that is already in the database, the data will be duplicated, so consider using the PUT /assets endpoint instead.
     """
     for file in files:  # Modificação: Iterar sobre cada arquivo na lista
         try:
@@ -64,7 +67,7 @@ async def upload_csv(files: List[UploadFile] = File(...), db: Session = Depends(
 
 
 
-@app.put("/update-assets/")
+@app.put("/assets/", tags=[TAG_MANAGE_DATA])
 async def upload_csv(files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
     total_insertions = 0
     total_updates = 0
@@ -95,37 +98,38 @@ async def upload_csv(files: List[UploadFile] = File(...), db: Session = Depends(
             raise HTTPException(status_code=500, detail=f"Error processing file {file.filename}: {str(e)}")
     return {"message": f"Data uploaded successfully: {total_insertions} insertions, {total_updates} updates"}
 
-@app.get("/highest-volume/", response_model=VolumeResponse)
-def highest_volume(ticker: str = None, db: Session = Depends(get_db)):
-    price = get_highest_volume(db, ticker)
-    if not price:
-        raise HTTPException(status_code=404, detail="No data found")
-    return price
-
-@app.get("/lowest-closing-price/", response_model=CloseResponse)
-def lowest_closing_price(ticker: str = None, db: Session = Depends(get_db)):
-    price = get_lowest_closing_price(db, ticker)
-    if not price:
-        raise HTTPException(status_code=404, detail="No data found")
-    return price
-
-@app.get("/mean-daily-price/", response_model=MeanPriceResponse)
-def mean_daily_price(ticker: str, date: str, db: Session = Depends(get_db)):
-    price = get_mean_daily_price(db, ticker, date)
-    if not price:
-        raise HTTPException(status_code=404, detail="No data found")
-    return price
-
-@app.get("/assets/")
+@app.get("/assets/", tags=[TAG_MANAGE_DATA])
 def assets(ticker: str = None, db: Session = Depends(get_db)):
     assets = get_assets(db, ticker)
     if not assets:
         raise HTTPException(status_code=404, detail="No assets found")
     return [{"ticker": asset.ticker} for asset in assets]
 
-@app.delete("/assets/{ticker}")
+@app.delete("/assets/{ticker}", tags=[TAG_MANAGE_DATA])
 def delete_asset_route(ticker: str, db: Session = Depends(get_db)):
     success = delete_asset(db, ticker)
     if not success:
         raise HTTPException(status_code=404, detail="Asset not found")
     return {"message": "Asset deleted successfully"}
+
+@app.get("/highest-volume/", response_model=VolumeResponse, tags=[TAG_STATISTICS])
+def highest_volume(ticker: str = None, db: Session = Depends(get_db)):
+    price = get_highest_volume(db, ticker)
+    if not price:
+        raise HTTPException(status_code=404, detail="No data found")
+    return price
+
+@app.get("/lowest-closing-price/", response_model=CloseResponse, tags=[TAG_STATISTICS])
+def lowest_closing_price(ticker: str = None, db: Session = Depends(get_db)):
+    price = get_lowest_closing_price(db, ticker)
+    if not price:
+        raise HTTPException(status_code=404, detail="No data found")
+    return price
+
+@app.get("/mean-daily-price/", response_model=MeanPriceResponse, tags=[TAG_STATISTICS])
+def mean_daily_price(ticker: str, date: str, db: Session = Depends(get_db)):
+    price = get_mean_daily_price(db, ticker, date)
+    if not price:
+        raise HTTPException(status_code=404, detail="No data found")
+    return price
+
