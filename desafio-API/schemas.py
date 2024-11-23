@@ -28,5 +28,9 @@ class MeanPriceResponse(BaseModel):
     date: date
     mean_price: float
 
-    class Config:
-        from_attributes = True
+class DailyVariationResponse(BaseModel):
+    date: date
+    variation: float
+
+class Config:
+    from_attributes = True

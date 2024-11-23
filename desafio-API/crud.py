@@ -11,6 +11,7 @@ def get_or_create_asset(db: Session, ticker: str):
         db.commit()
         db.refresh(asset)
     return asset
+
 def create_prices(db: Session, ticker: str, prices: list[PriceBase]):
     asset = get_or_create_asset(db, ticker)
     for price_data in prices:
@@ -18,14 +19,13 @@ def create_prices(db: Session, ticker: str, prices: list[PriceBase]):
         price = Price(asset_id=asset.id, **price_base.dict())
         db.add(price)
     db.commit()
-    
+
 def update_prices(db: Session, ticker: str, prices: list[PriceBase]):
     asset = get_or_create_asset(db, ticker)
     insertions = 0
     updates = 0
     for price_data in prices:
         existing_price = db.query(Price).filter(Price.asset_id == asset.id, Price.date == price_data.date).first()
-        # Verifica se já havia sido inserido e, se sim, atualiza data por data. Isso gera um overhead, mas aumenta a confiabilidade dos dados
         if existing_price:
             for key, value in price_data.dict().items():
                 setattr(existing_price, key, value)
@@ -37,10 +37,14 @@ def update_prices(db: Session, ticker: str, prices: list[PriceBase]):
     db.commit()
     return insertions, updates
 
-def get_highest_volume(db: Session, ticker: str = None):
+def get_highest_volume(db: Session, ticker: str = None, start_date: date = None, end_date: date = None):
     query = db.query(Price.date, Price.volume, Asset.ticker).join(Asset, Price.asset_id == Asset.id)
     if ticker:
         query = query.filter(Asset.ticker == ticker)
+    if start_date:
+        query = query.filter(Price.date >= start_date)
+    if end_date:
+        query = query.filter(Price.date <= end_date)
     result = query.order_by(Price.volume.desc()).first()
     if result:
         return {
@@ -50,10 +54,14 @@ def get_highest_volume(db: Session, ticker: str = None):
         }
     return None
 
-def get_lowest_closing_price(db: Session, ticker: str = None):
+def get_lowest_closing_price(db: Session, ticker: str = None, start_date: date = None, end_date: date = None):
     query = db.query(Price.date, Price.close, Asset.ticker).join(Asset, Price.asset_id == Asset.id)
     if ticker:
         query = query.filter(Asset.ticker == ticker)
+    if start_date:
+        query = query.filter(Price.date >= start_date)
+    if end_date:
+        query = query.filter(Price.date <= end_date)
     result = query.order_by(Price.close).first()
     if result:
         return {
@@ -63,18 +71,23 @@ def get_lowest_closing_price(db: Session, ticker: str = None):
         }
     return None
 
-def get_mean_daily_price(db: Session, ticker: str, date: date):
+def get_mean_daily_price(db: Session, ticker: str, start_date: date = None, end_date: date = None):
     query = db.query(Price.date, Price.open_price, Price.close, Asset.ticker).join(Asset, Price.asset_id == Asset.id)
-    query = query.filter(Asset.ticker == ticker, Price.date == date)
-    result = query.first()
-    if result:
+    query = query.filter(Asset.ticker == ticker)
+    if start_date:
+        query = query.filter(Price.date >= start_date)
+    if end_date:
+        query = query.filter(Price.date <= end_date)
+    results = query.all()
+    mean_prices = []
+    for result in results:
         mean_price = (result.open_price + result.close) / 2
-        return {
+        mean_prices.append({
             "ticker": result.ticker,
             "date": result.date,
             "mean_price": mean_price,
-        }
-    return None
+        })
+    return mean_prices
 
 def get_assets(db: Session, ticker: str):
     query = db.query(Asset)
@@ -90,3 +103,20 @@ def delete_asset(db: Session, ticker: str):
         db.commit()
         return True
     return False
+
+def get_daily_variation(db: Session, ticker: str, start_date: date = None, end_date: date = None):
+    query = db.query(Price.date, Price.open_price, Price.close).join(Asset, Price.asset_id == Asset.id)
+    query = query.filter(Asset.ticker == ticker)
+    if start_date:
+        query = query.filter(Price.date >= start_date)
+    if end_date:
+        query = query.filter(Price.date <= end_date)
+    results = query.all()
+    variations = []
+    for result in results:
+        variation = ((result.close - result.open_price) / result.open_price) * 100
+        variations.append({
+            "date": result.date,
+            "variation": variation
+        })
+    return variations
