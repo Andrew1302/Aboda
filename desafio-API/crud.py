@@ -11,7 +11,6 @@ def get_or_create_asset(db: Session, ticker: str):
         db.commit()
         db.refresh(asset)
     return asset
-
 def create_prices(db: Session, ticker: str, prices: list[PriceBase]):
     asset = get_or_create_asset(db, ticker)
     for price_data in prices:
@@ -19,6 +18,24 @@ def create_prices(db: Session, ticker: str, prices: list[PriceBase]):
         price = Price(asset_id=asset.id, **price_base.dict())
         db.add(price)
     db.commit()
+    
+def update_prices(db: Session, ticker: str, prices: list[PriceBase]):
+    asset = get_or_create_asset(db, ticker)
+    insertions = 0
+    updates = 0
+    for price_data in prices:
+        existing_price = db.query(Price).filter(Price.asset_id == asset.id, Price.date == price_data.date).first()
+        # Verifica se já havia sido inserido e, se sim, atualiza data por data. Isso gera um overhead, mas aumenta a confiabilidade dos dados
+        if existing_price:
+            for key, value in price_data.dict().items():
+                setattr(existing_price, key, value)
+            updates += 1
+        else:
+            price = Price(asset_id=asset.id, **price_data.dict())
+            db.add(price)
+            insertions += 1
+    db.commit()
+    return insertions, updates
 
 def get_highest_volume(db: Session, ticker: str = None):
     query = db.query(Price.date, Price.volume, Asset.ticker).join(Asset, Price.asset_id == Asset.id)
@@ -58,3 +75,18 @@ def get_mean_daily_price(db: Session, ticker: str, date: date):
             "mean_price": mean_price,
         }
     return None
+
+def get_assets(db: Session, ticker: str):
+    query = db.query(Asset)
+    if ticker:
+        query = query.filter(Asset.ticker == ticker) 
+    return query.all()
+
+def delete_asset(db: Session, ticker: str):
+    asset = db.query(Asset).filter(Asset.ticker == ticker).first()
+    if asset:
+        db.query(Price).filter(Price.asset_id == asset.id).delete()
+        db.delete(asset)
+        db.commit()
+        return True
+    return False

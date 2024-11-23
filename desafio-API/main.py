@@ -1,8 +1,10 @@
 from fastapi import FastAPI, UploadFile, Depends, HTTPException, File
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from database import Base, engine, get_db
 from models import Asset, Price
-from crud import create_prices, get_highest_volume, get_lowest_closing_price, get_mean_daily_price
+from schemas import PriceBase
+from crud import update_prices,create_prices, get_highest_volume, get_lowest_closing_price, get_mean_daily_price, get_assets, delete_asset
 from schemas import VolumeResponse, CloseResponse, MeanPriceResponse
 import pandas as pd
 from typing import List 
@@ -23,9 +25,18 @@ app = FastAPI(
 # Inicializar banco de dados
 Base.metadata.create_all(bind=engine)
 
-# Modificação: Alterar a assinatura da função para aceitar uma lista de arquivos
-@app.post("/upload-csv/")
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/docs")
+
+@app.post("/upload-assets/")
 async def upload_csv(files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
+    """
+    Insert a list of CSV files into the database.
+    Each file should contain the columns 'Date', 'Open', 'High', 'Low', 'Close', 'Adj Close' and 'Volume'.
+    If you upload a file from an asset that is already in the database, the data will be duplicated, so consider using the update-assets endpoint instead.
+    """
     for file in files:  # Modificação: Iterar sobre cada arquivo na lista
         try:
             df = pd.read_csv(file.file)
@@ -51,6 +62,39 @@ async def upload_csv(files: List[UploadFile] = File(...), db: Session = Depends(
             raise HTTPException(status_code=500, detail=f"Error processing file {file.filename}: {str(e)}")
     return {"message": "Data uploaded successfully"}
 
+
+
+@app.put("/update-assets/")
+async def upload_csv(files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
+    total_insertions = 0
+    total_updates = 0
+    for file in files:
+        try:
+            df = pd.read_csv(file.file)
+            required_columns = {"Date", "Open", "High", "Low", "Close", "Adj Close", "Volume"}
+            if not required_columns.issubset(df.columns):
+                raise HTTPException(status_code=400, detail=f"CSV file {file.filename} is missing required columns")
+            
+            ticker = file.filename.split('.')[0]  # Assumindo que o nome do arquivo é o ticker
+            prices = [
+                PriceBase(
+                    date=row["Date"],
+                    open_price=row["Open"],
+                    high=row["High"],
+                    low=row["Low"],
+                    close=row["Close"],
+                    adj_close=row["Adj Close"],
+                    volume=row["Volume"],
+                )
+                for _, row in df.iterrows()
+            ]
+            insertions, updates = update_prices(db, ticker, prices)
+            total_insertions += insertions
+            total_updates += updates
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error processing file {file.filename}: {str(e)}")
+    return {"message": f"Data uploaded successfully: {total_insertions} insertions, {total_updates} updates"}
+
 @app.get("/highest-volume/", response_model=VolumeResponse)
 def highest_volume(ticker: str = None, db: Session = Depends(get_db)):
     price = get_highest_volume(db, ticker)
@@ -71,3 +115,17 @@ def mean_daily_price(ticker: str, date: str, db: Session = Depends(get_db)):
     if not price:
         raise HTTPException(status_code=404, detail="No data found")
     return price
+
+@app.get("/assets/")
+def assets(ticker: str = None, db: Session = Depends(get_db)):
+    assets = get_assets(db, ticker)
+    if not assets:
+        raise HTTPException(status_code=404, detail="No assets found")
+    return [{"ticker": asset.ticker} for asset in assets]
+
+@app.delete("/assets/{ticker}")
+def delete_asset_route(ticker: str, db: Session = Depends(get_db)):
+    success = delete_asset(db, ticker)
+    if not success:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return {"message": "Asset deleted successfully"}
