@@ -22,12 +22,12 @@ Esta API foi construída como parte do processo seletivo da Aboda. Ela permite o
 1. Clone o repositório:
 
    ```sh
-   git clone <https://github.com/Andrew1302/Aboda>
+   git clone https://github.com/Andrew1302/Aboda
    ```
 2. Navegue até o diretório do projeto
 
    ```sh
-   cd .\desafio-API\
+   cd Aboda\desafio-API
    ```
 3. Construa e inicie o Docker
 
@@ -36,4 +36,4 @@ Esta API foi construída como parte do processo seletivo da Aboda. Ela permite o
    ```
 4. Acesse a API em seu navegador
 
-   [http://localhost:8000/]()
+   [http://localhost:8000/](http://localhost:8000)
