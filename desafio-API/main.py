@@ -71,6 +71,12 @@ async def upload_csv(files: List[UploadFile] = File(...), db: Session = Depends(
 
 @app.put("/assets/", tags=[TAG_MANAGE_DATA])
 async def upload_csv(files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
+    """
+    Insert a list of CSV files into the database.
+    If you upload a file from an asset that is already in the database, the data will be updated.
+    \nReturns:
+        The number of insertions and updates made.
+    """
     total_insertions = 0
     total_updates = 0
     for file in files:
@@ -102,6 +108,10 @@ async def upload_csv(files: List[UploadFile] = File(...), db: Session = Depends(
 
 @app.get("/assets/", tags=[TAG_MANAGE_DATA])
 def assets(ticker: str = None, db: Session = Depends(get_db)):
+    """
+    Returns:
+        List of all assets in the database.
+    """
     if ticker:
         ticker = ticker.upper()
     assets = get_assets(db, ticker)
@@ -111,6 +121,9 @@ def assets(ticker: str = None, db: Session = Depends(get_db)):
 
 @app.delete("/assets/{ticker}", tags=[TAG_MANAGE_DATA])
 def delete_asset_route(ticker: str, db: Session = Depends(get_db)):
+    """
+    Delete the provided asset from the database, both from the Asset and Price tables.
+    """
     ticker = ticker.upper()
     success = delete_asset(db, ticker)
     if not success:
