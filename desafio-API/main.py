@@ -8,7 +8,7 @@ from models import Asset, Price
 from schemas import ConsolidatedResponse, DailyVariationResponse, PriceBase, PaginatedResponse
 from crud import get_consolidated_data, update_prices, create_prices, get_highest_volume, get_lowest_closing_price
 from crud import get_mean_daily_price, get_assets, delete_asset, get_daily_variation
-from schemas import VolumeResponse, CloseResponse, MeanPriceResponse
+from schemas import VolumeResponse, LowestClosingPriceResponse, MeanPriceResponse
 import pandas as pd
 from typing import List
 from utils import paginate
@@ -136,7 +136,7 @@ def highest_volume(ticker: str = None, start_date: date = None, end_date: date =
         raise HTTPException(status_code=404, detail="No data found")
     return price
 
-@app.get("/lowest-closing-price/", response_model=CloseResponse, tags=[TAG_STATISTICS])
+@app.get("/lowest-closing-price/", response_model=LowestClosingPriceResponse, tags=[TAG_STATISTICS])
 def lowest_closing_price(ticker: str = None, start_date: date = None, end_date: date = None, db: Session = Depends(get_db)):
     """
     Get the lowest-closing-price for a given ticker.
